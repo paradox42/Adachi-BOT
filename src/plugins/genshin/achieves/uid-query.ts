@@ -4,11 +4,35 @@ import { Redis } from "../../../bot";
 import { render } from "../utils/render";
 
 function getID( data: string ): [ number, string ] | string {
-	if ( data.length !== 9 || ( data[0] !== "1" && data[0] !== "5" ) ) {
+	// if ( data.length !== 9 || ( data[0] !== "1" && data[0] !== "5" ) ) {
+	const regex = new RegExp("^([1,5,6,7,8,9])[0-9]{8}$");
+	if (data.length != 9 || !regex.test(data)) {
 		return "输入 UID 不合法";
 	}
 	const uid: number = parseInt( data );
-	const region: string = data[0] === "1" ? "cn_gf01" : "cn_qd01";
+	var region: string;
+	switch (data[0]) {
+		case '1':
+			region = 'cn_gf01';
+			break;
+		case '5':
+			region = 'cn_qd01'
+			break;
+		case '6':
+			region = 'os_usa'
+			break;
+		case '7':
+			region = 'os_euro'
+			break;
+		case '8':
+			region = 'os_asia'
+			break;
+		case '9':
+			region = 'os_cht'
+			break;
+		default:
+			region = 'invalid'
+	}
 	
 	return [ uid, region ];
 }
