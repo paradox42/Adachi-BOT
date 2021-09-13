@@ -1,10 +1,9 @@
 import { GroupMessageEventData, PrivateMessageEventData } from "oicq";
-import { characterInfoPromise, detailInfoPromise } from "../utils/promise";
+import { osCharacterInfoPromise, characterInfoPromise, osDetailInfoPromise, detailInfoPromise } from "../utils/promise";
 import { Redis } from "../../../bot";
 import { render } from "../utils/render";
 
 function getID( data: string ): [ number, string ] | string {
-	// if ( data.length !== 9 || ( data[0] !== "1" && data[0] !== "5" ) ) {
 	const regex = new RegExp("^([1,5,6,7,8,9])[0-9]{8}$");
 	if (data.length != 9 || !regex.test(data)) {
 		return "输入 UID 不合法";
@@ -37,6 +36,12 @@ function getID( data: string ): [ number, string ] | string {
 	return [ uid, region ];
 }
 
+function isCNServer(data): boolean {
+	if(data[0] === '1' || data[0] === '5')
+		return true;
+	return false;
+}
+
 type Message = GroupMessageEventData | PrivateMessageEventData;
 
 async function main( sendMessage: ( content: string ) => any, message: Message ): Promise<void> {
@@ -55,8 +60,13 @@ async function main( sendMessage: ( content: string ) => any, message: Message )
 			uid: info[0],
 			level: 0
 		} );
-		const detailInfo = await detailInfoPromise( qqID, ...info, false ) as number[]
-		await characterInfoPromise( qqID, ...info, detailInfo );
+		if (isCNServer(data)) {
+			const detailInfo = await detailInfoPromise(qqID, ...info, false) as number[];
+			await characterInfoPromise(qqID, ...info, detailInfo);
+		} else {
+			const detailInfo = await osDetailInfoPromise(qqID, info[0]) as number[];
+			await osCharacterInfoPromise(qqID, info[0]);
+		}
 	} catch ( error ) {
 		if ( error !== "gotten" ) {
 			await sendMessage( error as string );
