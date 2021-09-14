@@ -4,7 +4,7 @@ import { Redis } from "../../../bot";
 import { render } from "../utils/render";
 
 function getID( data: string ): [ number, string ] | string {
-	const regex = new RegExp("^([1,5,6,7,8,9])[0-9]{8}$");
+	const regex = new RegExp("^([1,2,3,5,6,7,8,9])[0-9]{8}$");
 	if (data.length != 9 || !regex.test(data)) {
 		return "输入 UID 不合法";
 	}
@@ -12,6 +12,8 @@ function getID( data: string ): [ number, string ] | string {
 	var region: string;
 	switch (data[0]) {
 		case '1':
+		case '2':
+		case '3':
 			region = 'cn_gf01';
 			break;
 		case '5':
@@ -37,7 +39,7 @@ function getID( data: string ): [ number, string ] | string {
 }
 
 function isCNServer(data): boolean {
-	if(data[0] === '1' || data[0] === '5')
+	if(data[0] === '1' || data[0] === '5' || data[0] === '2' || data[0] === '3')
 		return true;
 	return false;
 }

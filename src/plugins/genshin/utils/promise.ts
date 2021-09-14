@@ -52,7 +52,7 @@ async function osDetailInfoPromise(qqID: number, uid: number): Promise<string | 
 
 	return new Promise(async (resolve, reject) => {
 		if (data.code) {
-			return reject(`error: ${data.message}`);
+			return reject(`api error: ${data.message}`);
 		}
 		else {
 			await Redis.setHash(`silvery-star.card-data-${qqID}`, {
