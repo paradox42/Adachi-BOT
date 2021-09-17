@@ -9,11 +9,14 @@ import { ArtClass } from "./module/artifact";
 import { WishClass } from "./module/wish";
 import { SlipClass } from "./module/slip";
 import { createBrowser } from "./utils/render";
+import { AliasClass } from "./module/alias";
+import { AuthLevel } from "../../modules/auth";
 
 let cookies: Cookies;
 let artClass: ArtClass;
 let wishClass: WishClass;
 let slipClass: SlipClass;
+let aliasClass: AliasClass;
 let typeData: TypeData;
 let config: any;
 
@@ -81,7 +84,7 @@ const defaultCommandList: ( Order | Question )[] = [ {
 	key: "silvery-star.character",
 	docs: [ "角色信息", "<角色名>" ],
 	headers: [ "char" ],
-	regexps: [ " *[\\u4e00-\\u9fa5]+" ],
+	regexps: [ " *[0-9a-z\\u4e00-\\u9fa5]+" ],
 	main: "achieves/character"
 }, 
 {
@@ -89,7 +92,7 @@ const defaultCommandList: ( Order | Question )[] = [ {
 	key: "silvery-star.information",
 	docs: [ "信息", "<角色|武器名>" ],
 	headers: [ "info" ],
-	regexps: [ " *[\\u4e00-\\u9fa5]+" ],
+	regexps: [ " *[0-9a-z\\u4e00-\\u9fa5]+" ],
 	main: "achieves/info"
 }, {
 	commandType: "order",
@@ -98,6 +101,14 @@ const defaultCommandList: ( Order | Question )[] = [ {
 	headers: [ "s", "slip" ],
 	regexps: [ "" ],
 	main: "achieves/slip"
+}, {
+	commandType: "order",
+	key: "silvery-star.alias-customize",
+	docs: [ "修改别名", "<remove|add> <本名> <别名>" ],
+	headers: [ "alias" ],
+	regexps: [ " (remove|add) [\\u4e00-\\u9fa5]+ [0-9a-z\\u4e00-\\u9fa5]+$" ],
+	main: "achieves/alias",
+	authLimit: AuthLevel.Manager
 } ];
 
 function getKeys(): any {
@@ -151,10 +162,20 @@ async function init(): Promise<any> {
 	wishClass = new WishClass();
 	slipClass = new SlipClass( await getSlip() );
 	typeData = new TypeData();
+	aliasClass = new AliasClass();
 	createServer();
 	await createBrowser();
 	
 	return addPlugin( "genshin", ...initCommandList( config ) );
 }
 
-export { init, cookies, config, artClass, wishClass, slipClass, typeData }
+export {
+	init,
+	cookies,
+	config,
+	artClass,
+	wishClass,
+	slipClass,
+	aliasClass,
+	typeData
+}
