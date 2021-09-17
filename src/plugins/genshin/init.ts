@@ -59,14 +59,16 @@ const defaultCommandList: ( Order | Question )[] = [ {
 	headers: [ "dom" ],
 	regexps: [ "" ],
 	main: "achieves/domain"
-}, {
-	commandType: "order",
-	key: "silvery-star.wish",
-	docs: [ "抽卡", "" ],
-	headers: [ "wish", "w" ],
-	regexps: [ "" ],
-	main: "achieves/wish"
-}, {
+}, 
+// {
+// 	commandType: "order",
+// 	key: "silvery-star.wish",
+// 	docs: [ "抽卡", "" ],
+// 	headers: [ "wish", "w" ],
+// 	regexps: [ "" ],
+// 	main: "achieves/wish"
+// }, 
+{
 	commandType: "order",
 	key: "silvery-star.choose",
 	docs: [ "切换卡池", "<角色|武器|常驻>" ],
@@ -74,14 +76,14 @@ const defaultCommandList: ( Order | Question )[] = [ {
 	regexps: [ " *(角色|武器|常驻)" ],
 	main: "achieves/choose"
 }, 
-// {
-// 	commandType: "order",
-// 	key: "silvery-star.character",
-// 	docs: [ "角色信息", "<角色名>" ],
-// 	headers: [ "char" ],
-// 	regexps: [ " *[\\u4e00-\\u9fa5]+" ],
-// 	main: "achieves/character"
-// }, 
+{
+	commandType: "order",
+	key: "silvery-star.character",
+	docs: [ "角色信息", "<角色名>" ],
+	headers: [ "char" ],
+	regexps: [ " *[\\u4e00-\\u9fa5]+" ],
+	main: "achieves/character"
+}, 
 {
 	commandType: "order",
 	key: "silvery-star.information",
