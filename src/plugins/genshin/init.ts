@@ -78,16 +78,14 @@ const defaultCommandList: ( Order | Question )[] = [ {
 	headers: [ "choose", "t" ],
 	regexps: [ " *(角色|武器|常驻)" ],
 	main: "achieves/choose"
-}, 
-{
+}, {
 	commandType: "order",
 	key: "silvery-star.character",
 	docs: [ "角色信息", "<角色名>" ],
 	headers: [ "char" ],
 	regexps: [ " *[0-9a-z\\u4e00-\\u9fa5]+" ],
 	main: "achieves/character"
-}, 
-{
+}, {
 	commandType: "order",
 	key: "silvery-star.information",
 	docs: [ "信息", "<角色|武器名>" ],
