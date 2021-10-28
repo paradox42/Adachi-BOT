@@ -2,6 +2,8 @@ import { GroupMessageEventData, PrivateMessageEventData } from "oicq";
 import { osCharacterInfoPromise, characterInfoPromise, osDetailInfoPromise, detailInfoPromise } from "../utils/promise";
 import { Redis } from "../../../bot";
 import { render } from "../utils/render";
+import { sendType } from "../../../modules/message";
+import { config } from "../init";
 
 function getID( data: string ): [ number, string ] | string {
 	const regex = new RegExp("^([1,2,3,5,6,7,8,9])[0-9]{8}$");
@@ -46,7 +48,7 @@ function isCNServer(data): boolean {
 
 type Message = GroupMessageEventData | PrivateMessageEventData;
 
-async function main( sendMessage: ( content: string ) => any, message: Message ): Promise<void> {
+async function main( sendMessage: sendType, message: Message ): Promise<void> {
 	const data: string = message.raw_message;
 	const qqID: number = message.user_id;
 	const info: [ number, string ] | string = getID( data );
@@ -75,7 +77,7 @@ async function main( sendMessage: ( content: string ) => any, message: Message )
 			return;
 		}
 	}
-	const image: string = await render( "card", { qq: qqID } );
+	const image: string = await render( "card", { qq: qqID, style: config.cardWeaponStyle } );
 	await sendMessage( image );
 }
 

@@ -1,6 +1,8 @@
 import { CommonMessageEventData as Message } from "oicq";
+import { sendType } from "../../../modules/message";
 import { baseInfoPromise, characterInfoPromise, detailInfoPromise } from "../utils/promise";
 import { Redis } from "../../../bot";
+import { config } from "../init";
 import { render } from "../utils/render";
 
 async function getID( data: string, qqID: number ): Promise<number | string> {
@@ -18,7 +20,7 @@ async function getID( data: string, qqID: number ): Promise<number | string> {
 	}
 }
 
-async function main( sendMessage: ( content: string ) => any, message: Message ): Promise<void> {
+async function main( sendMessage: sendType, message: Message ): Promise<void> {
 	const data: string = message.raw_message;
 	const qqID: number = message.user_id;
 	const info: number | string = await getID( data, qqID );
@@ -38,7 +40,7 @@ async function main( sendMessage: ( content: string ) => any, message: Message )
 			return;
 		}
 	}
-	const image: string = await render( "card", { qq: qqID } )
+	const image: string = await render( "card", { qq: qqID, style: config.cardWeaponStyle } )
 	await sendMessage( image );
 }
 

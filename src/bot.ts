@@ -1,29 +1,35 @@
 import {
 	Client,
-	CommonMessageEventData,
-	createClient,
 	GroupInfo,
+	CommonMessageEventData,
 	GroupMessageEventData,
-	PrivateMessageEventData
+	PrivateMessageEventData,
+	GroupInviteEventData,
+	FriendAddEventData,
+	createClient
 } from "oicq";
-import { getSendMessageFunc, MessageType, removeStringPrefix } from "./modules/message";
-import { createFolder, createYAML, exists, loadYAML } from "./utils/config";
 import { loadPlugins } from "./modules/plugin";
+import { scheduleJob } from "node-schedule";
 import { resolve } from "path";
-import { readFileSync, renameSync } from "fs";
-import { AuthLevel, getAuthLevel } from "./modules/auth";
+import { trim } from "lodash";
+import { createFolder, createYAML, exists } from "./utils/config";
+import { readFileSync, renameSync, unlinkSync, readdirSync } from "fs";
+import { getSendMessageFunc, removeStringPrefix, sendType, MessageType } from "./modules/message";
+import { checkAuthLevel, getAuthLevel, AuthLevel } from "./modules/auth";
+import { Command, CommandMatchResult } from "./modules/command";
 import { Database } from "./utils/database";
-import { Command } from "./modules/command";
+import { BotConfig } from "./modules/config";
+import { Interval } from "./modules/interval";
 import { ROOTPATH } from "../app";
 
 /* setting.yml 配置文件 */
-let botConfig: any;
+let botConfig: BotConfig;
+/* 操作时间间隔 */
+let interval: Interval;
 /* bot 实例对象 */
 let Adachi: Client;
 /* redis 数据库实例 */
 let Redis: Database;
-/* 操作时间戳缓存 */
-let unixTimeTemp: { [key: string]: number } = {};
 /* 插件列表 */
 let groupCommands: Command[][] = [];
 let privateCommands: Command[][] = [];
@@ -45,17 +51,7 @@ function init(): void {
 	}
 	
 	/* 初始化账号配置文件 */
-	createYAML( "setting", {
-		qrcode: "true 启用扫码登录,每次登录都需验证,Docker 启动禁用,默认不启用",
-		number: "QQ 账号",
-		password: "QQ 密码",
-		master: "BOT 持有者账号",
-		header: "命令起始符(可为空串\"\")",
-		platform: "1.安卓手机(默认) 2.aPad 3.安卓手表 4.MacOS 5.iPad",
-		atUser: "true 启用回复 at 用户,默认关闭",
-		intervalTime: "指令操作CD,单位 ms,默认 1500ms",
-		dbPort: 56379
-	} );
+	createYAML( "setting", BotConfig.initObject );
 	
 	/* 初始化命令头配置文件 */
 	createYAML( "commands", {
@@ -83,20 +79,14 @@ async function migrate(): Promise<void> {
 }
 
 function setEnvironment(): void {
-	botConfig = loadYAML( "setting" );
+	botConfig = new BotConfig();
 	
-	if ( typeof botConfig.platform === "string" ) {
-		botConfig.platform = 1;
-	}
-	if ( typeof botConfig.intervalTime === "string" || !botConfig.intervalTime ) {
-		botConfig.intervalTime = 1500;
-	}
 	Adachi = createClient( botConfig.number, {
 		log_level: "debug",
 		platform: botConfig.platform
 	} );
 	
-	if ( botConfig.qrcode === true ) {
+	if ( botConfig.qrcode ) {
 		/* 扫码登录 */
 		Adachi.on( "system.login.qrcode", () => {
 			Adachi.logger.mark( "手机扫码完成后按下 Enter 继续...\n" );
@@ -129,13 +119,15 @@ function setEnvironment(): void {
 async function run(): Promise<void> {
 	/* 连接 Redis 数据库 */
 	Redis = new Database( botConfig.dbPort );
+	/* 加载命令间隔控制 */
+	interval = new Interval();
 	/* 加载插件 */
 	await loadPlugins();
 	
 	/* 监听群消息事件，运行群聊插件 */
 	Adachi.on( "message.group", async ( messageData: GroupMessageEventData ) => {
 		const { raw_message: content, user_id: qqID, group_id: groupID } = messageData;
-		if ( timeCheck( qqID ) ) {
+		if ( !interval.check( qqID, groupID ) ) {
 			return;
 		}
 		
@@ -145,7 +137,7 @@ async function run(): Promise<void> {
 			const auth: AuthLevel = await getAuthLevel( qqID );
 			const groupLimit: string[] = await Redis.getList( `adachi.group-command-limit-${ groupID }` );
 			const userLimit: string[] = await Redis.getList( `adachi.user-command-limit-${ qqID }` );
-			const sendMessage: ( content: string ) => any = getSendMessageFunc( qqID, MessageType.Group, groupID );
+			const sendMessage: sendType = getSendMessageFunc( qqID, MessageType.Group, groupID );
 			execute( sendMessage, messageData, content, groupCommands[auth], [ ...groupLimit, ...userLimit ] );
 		}
 	} );
@@ -153,39 +145,66 @@ async function run(): Promise<void> {
 	/* 监听私聊消息事件，运行私聊插件 */
 	Adachi.on( "message.private", async ( messageData: PrivateMessageEventData ) => {
 		const { raw_message: content, user_id: qqID } = messageData;
-		if ( timeCheck( qqID ) ) {
+		if ( !interval.check( qqID, -1 ) ) {
 			return;
 		}
 		
 		const auth: AuthLevel = await getAuthLevel( qqID );
 		const limit: string[] = await Redis.getList( `adachi.user-command-limit-${ qqID }` );
-		const sendMessage: ( content: string ) => any = getSendMessageFunc( qqID, MessageType.Private );
+		const sendMessage: sendType = getSendMessageFunc( qqID, MessageType.Private );
 		execute( sendMessage, messageData, content, privateCommands[auth], limit );
+	} );
+	
+	/* 自动接受入群邀请 */
+	Adachi.on( "request.group.invite", async ( inviteData: GroupInviteEventData ) => {
+		const inviterID: number = inviteData.user_id;
+		if ( await checkAuthLevel( inviterID, botConfig.inviteAuth ) ) {
+			await Adachi.setGroupAddRequest( inviteData.flag );
+		} else {
+			Adachi.logger.info( `用户 ${ inviterID } 权限不足邀请入群` );
+		}
+	} );
+	
+	/* 自动接受添加好友邀请 */
+	Adachi.on( "request.friend.add", async ( addDate: FriendAddEventData ) => {
+		await Adachi.setFriendAddRequest( addDate.flag );
+	} );
+	
+	/* 定时清理图片下载缓存 */
+	scheduleJob( "0 0 0 ? * WED", () => {
+		const dirPath: string = resolve( ROOTPATH, "data/image" );
+		const files: string[] = readdirSync( dirPath );
+		files.forEach( el => {
+			const path: string = resolve( dirPath, el );
+			unlinkSync( path );
+		} );
+		Adachi.logger.info( "图片缓存已清空" );
 	} );
 }
 
-function timeCheck( qqID: number ): boolean {
-	const nowTime: number = ( new Date() ).valueOf();
-	if ( unixTimeTemp[qqID] && nowTime - unixTimeTemp[qqID] <= botConfig.intervalTime ) {
-		return true;
-	}
-	unixTimeTemp[qqID] = nowTime;
-	return false;
-}
-
-function execute( sendMessage: ( content: string ) => any, message: CommonMessageEventData, content: string, commands: Command[], limit: string[] ): void {
+function execute(
+	sendMessage: sendType,
+	message: CommonMessageEventData,
+	content: string,
+	commands: Command[],
+	limit: string[]
+): void {
 	for ( let command of commands ) {
 		/* 判断命令限制 */
 		if ( !limit.includes( command.key ) ) {
-			const match: string | string[] = command.match( content );
-			if ( typeof match === "string" && match !== "" ) {
-				message.raw_message = removeStringPrefix( removeStringPrefix( content, match ), " " );
-				command.run( sendMessage, message, match );
-				break;
+			const res: CommandMatchResult = command.match( content );
+			if ( res.type === "unmatch" ) {
+				continue;
 			}
-			if ( match instanceof Array && match.length !== 0 ) {
-				command.run( sendMessage, message, match );
+			if ( res.type === "order") {
+				message.raw_message = trim(
+					removeStringPrefix( content, res.header )
+						.replace( / +/g, " " )
+				);
+				command.run( sendMessage, message, res );
 				break;
+			} else {
+				command.run( sendMessage, message, res );
 			}
 		}
 	}
@@ -193,12 +212,8 @@ function execute( sendMessage: ( content: string ) => any, message: CommonMessag
 
 export {
 	setEnvironment,
-	migrate,
-	run,
-	init,
-	Redis,
-	Adachi,
-	botConfig,
-	groupCommands,
-	privateCommands
+	migrate, run, init,
+	Redis, Adachi,
+	botConfig, interval,
+	groupCommands, privateCommands
 }

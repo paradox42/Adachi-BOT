@@ -18,11 +18,7 @@ export default Vue.defineComponent( {
 	setup( props ) {
 		const starBackground = Vue.computed( () => {
 			let star = props.char.rarity;
-			/* for Aloy */
-			if ( props.char.rarity === 105 ) {
-				star = 5;
-			}
-			return `/public/images/rarity/${ star }-star.png`;
+			return `/public/images/rarity/${ star }-Star.png`;
 		} );
 		
 		return {
